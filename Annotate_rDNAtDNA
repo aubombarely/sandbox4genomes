@@ -1,0 +1,129 @@
+#!/bin/bash
+
+## Annotate_rDNAtDNA
+## Script to annotate rDNA using BARNAP
+## and tDNA using tRNAScan
+
+## Developed by Aureliano Bombarely
+## 2026-03-22
+
+##########################
+## DEFINE HELP FUNCTION ##
+##########################
+
+Help()
+{
+        echo "Usage: Annotate_rDNAtDNA -g <genome.fasta> -o <outbase>";
+        echo "       [-t <threads>]";
+        echo "";
+        echo " Arguments:";
+        echo "  -h <print_this_help>"
+        echo "  -g <genome.fasta> [MANDATORY]";
+        echo "  -o <outbase> [MANDATORY]";
+        echo "  -t <threads> [OPTIONAL, default:8]";
+        echo "";
+        echo " Note: The program assumes barrnap and tRNAscan-SE in the PATH.";
+        echo "       It is recommended to create a conda environment with them.";
+        echo "       For example, conda create -n rdnatdna -c bioconda barrnap trnascan-se";
+        echo "       and then activate rdnatdna";
+        echo "";
+}
+
+###############################
+## DEFINE ARGUMENTS FUNCTION ##
+###############################
+
+genome="";
+outbase="";
+threads="";
+
+while getopts ":hg:o:t:" option; do
+   case $option in
+      h) ## Print help and exit
+         Help
+         exit;;
+      g) ## Get the genome option
+         genome=$OPTARG;;
+      o) ## Get the outbase option
+         outbase=$OPTARG;;
+      t) ## Get the number of threads
+         threads=$OPTARG;;
+     \?) # Invalid option
+         echo "";
+         echo "Error: Invalid option. Please check help running the command:"
+         echo "";
+         echo "Annotate_rDNAtDNA -h";
+         echo "";
+         exit;;
+   esac
+done
+
+###########################
+## DEFINE DEFAULT VALUES ##
+###########################
+
+threads="${threads:-8}";
+
+## Print help if no argument is used
+
+if [[ -z $genome ]]
+then
+        echo "";
+        echo "No arguments used... printing usage";
+        echo "";
+        Help;
+        exit;
+else
+        if ! [ -f $genome ]
+        then
+           echo "";
+           echo "ERROR: <genome.fasta> $genome file does not exist";
+           echo "";
+           exit;
+
+        else
+           if [[ -z $outbase ]]
+           then
+              echo "";
+              echo "ERROR: <outbase> is a mandatory argument.";
+              echo "";
+              exit;
+           fi
+        fi
+fi
+
+###########################
+## RUN THE PROGRAMS      ##
+###########################
+
+
+## 1- Run BARNAP
+## It will use 8 threads by default 
+echo "";
+echo "1- Running BARNAP"
+date;
+echo "";
+barrnap --threads $threads --kingdom euk $genome > $outbase".rDNA.gff3"
+echo "";
+
+## 2- Run tRNAScan
+echo "";
+echo "2- Running tRNAScan"
+date;
+echo "";
+tRNAscan-SE -E -o $outbase".trnascan.out.txt" -m $outbase".trnascan.stats.txt" $genome -j $outbase".tDNA.gff3" --thread $threads
+echo "";
+
+## 3- Generate a summary
+echo "";
+echo "===================";
+echo "SUMMARY:";
+echo "===================";
+echo "* rDNA annotation:";
+grep -v "#" $outbase".rDNA.gff3" | cut -f9 | cut -d ';' -f2 | sort | uniq -c
+echo "";
+echo "* tDNA annotation:";
+grep -v "#" $outbase".tDNA.gff3" | cut -f3 | sort | uniq -c
+echo "===================";
+echo "";
+
